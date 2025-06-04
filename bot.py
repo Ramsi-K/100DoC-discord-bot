@@ -3,14 +3,25 @@ from discord.ext import commands, tasks
 import json
 import sqlite3
 import re
-from datetime import datetime, timedelta, timezone
+import datetime
+
+# from datetime import datetime, timedelta, timezone
 import asyncio
 from typing import Dict, List, Optional, Tuple
 import logging
+import os
+from dotenv import load_dotenv
+
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+load_dotenv()
+print("ENV loaded")
+print("TOKEN =", os.getenv("DISCORD_BOT_TOKEN"))
+
+TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
 
 class ChannelConfig:
@@ -82,11 +93,11 @@ class DatabaseManager:
                 "user_id": row[0],
                 "username": row[1],
                 "current_day": row[2],
-                "last_post_timestamp": datetime.fromisoformat(row[3]),
+                "last_post_timestamp": datetime.datetime.fromisoformat(row[3]),
                 "is_active": bool(row[4]),
-                "created_at": datetime.fromisoformat(row[5]),
+                "created_at": datetime.datetime.fromisoformat(row[5]),
                 "completed_at": (
-                    datetime.fromisoformat(row[6]) if row[6] else None
+                    datetime.datetime.fromisoformat(row[6]) if row[6] else None
                 ),
             }
         return None
@@ -97,7 +108,7 @@ class DatabaseManager:
         cursor = conn.cursor()
 
         try:
-            now = datetime.now(timezone.utc).isoformat()
+            now = datetime.datetime.now(datetime.timezone.utc).isoformat()
             cursor.execute(
                 """
                 INSERT INTO user_streaks 
@@ -121,7 +132,7 @@ class DatabaseManager:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
         completed_at = now if new_day == 100 else None
 
         cursor.execute(
@@ -162,7 +173,7 @@ class DatabaseManager:
                 "user_id": row[0],
                 "username": row[1],
                 "current_day": row[2],
-                "last_post_timestamp": datetime.fromisoformat(row[3]),
+                "last_post_timestamp": datetime.datetime.fromisoformat(row[3]),
             }
             for row in rows
         ]
@@ -173,7 +184,8 @@ class DatabaseManager:
         cursor = conn.cursor()
 
         threshold_date = (
-            datetime.now(timezone.utc) - timedelta(days=days_threshold)
+            datetime.datetime.now(datetime.timezone.utc)
+            - datetime.timedelta(days=days_threshold)
         ).isoformat()
 
         cursor.execute(
@@ -193,7 +205,7 @@ class DatabaseManager:
                 "user_id": row[0],
                 "username": row[1],
                 "current_day": row[2],
-                "last_post_timestamp": datetime.fromisoformat(row[3]),
+                "last_post_timestamp": datetime.datetime.fromisoformat(row[3]),
             }
             for row in rows
         ]
@@ -220,7 +232,7 @@ class DatabaseManager:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
         cursor.execute(
             """
             UPDATE user_streaks 
@@ -240,7 +252,7 @@ class DatabaseManager:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
         completed_at = now if day == 100 else None
 
         # Check if user exists
@@ -312,15 +324,17 @@ class StreakValidator:
             )
 
     @staticmethod
-    def check_time_constraint(last_post_time: datetime) -> Tuple[bool, str]:
+    def check_time_constraint(
+        last_post_time: datetime.datetime,
+    ) -> Tuple[bool, str]:
         """Check if enough time has passed since last post"""
-        now = datetime.now(timezone.utc)
+        now = datetime.datetime.now(datetime.timezone.utc)
         time_diff = now - last_post_time
 
-        if time_diff >= timedelta(hours=24):
+        if time_diff >= datetime.timedelta(hours=24):
             return True, ""
 
-        remaining = timedelta(hours=24) - time_diff
+        remaining = datetime.timedelta(hours=24) - time_diff
         hours = remaining.seconds // 3600
         minutes = (remaining.seconds % 3600) // 60
 
@@ -442,14 +456,15 @@ class HundredDoCBot(commands.Bot):
         embed = discord.Embed(
             title="🏆 100 Days of Code Leaderboard",
             color=0x00FF00,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.datetime.now(datetime.timezone.utc),
         )
 
         medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
 
         for i, user in enumerate(top_users):
             days_ago = (
-                datetime.now(timezone.utc) - user["last_post_timestamp"]
+                datetime.datetime.now(datetime.timezone.utc)
+                - user["last_post_timestamp"]
             ).days
             status = f"Day {user['current_day']}"
             if days_ago > 0:
@@ -570,7 +585,8 @@ class HundredDoCBot(commands.Bot):
             return
 
         days_ago = (
-            datetime.now(timezone.utc) - user_data["last_post_timestamp"]
+            datetime.datetime.now(datetime.timezone.utc)
+            - user_data["last_post_timestamp"]
         ).days
         status = "Active" if user_data["is_active"] else "Inactive"
 
@@ -603,7 +619,9 @@ class HundredDoCBot(commands.Bot):
 
         await ctx.send(embed=embed)
 
-    @tasks.loop(time=datetime.time(hour=10, minute=0, tzinfo=timezone.utc))
+    @tasks.loop(
+        time=datetime.time(hour=10, minute=0, tzinfo=datetime.timezone.utc)
+    )
     async def daily_reminder_check(self):
         """Daily task to check for inactive users and send reminders"""
         try:
@@ -647,7 +665,7 @@ class HundredDoCBot(commands.Bot):
 
                 for user_data in inactive_users:
                     days_inactive = (
-                        datetime.now(timezone.utc)
+                        datetime.datetime.now(datetime.timezone.utc)
                         - user_data["last_post_timestamp"]
                     ).days
 
@@ -696,29 +714,45 @@ class HundredDoCBot(commands.Bot):
         """Wait for bot to be ready before starting reminder task"""
         await self.wait_until_ready()
 
+    # async def setup_hook(self):
+    #     #     self.add_command(self.leaderboard)
+    #     #     self.add_command(self.help_command)
+    #     #     self.add_command(self.reset_user)
+    #     #     self.add_command(self.force_add_user)
+    #     #     self.add_command(self.user_status)
+    #     self.add_command(commands.Command(self.leaderboard))
+    #     self.add_command(commands.Command(self.help_command))
+    #     self.add_command(commands.Command(self.reset_user))
+    #     self.add_command(commands.Command(self.force_add_user))
+    #     self.add_command(commands.Command(self.user_status))
 
-# Error handlers
-@HundredDoCBot.event
-async def on_command_error(ctx, error):
-    """Handle command errors"""
-    if isinstance(error, commands.MissingPermissions):
-        await ctx.send("❌ You don't have permission to use this command.")
-    elif isinstance(error, commands.MemberNotFound):
-        await ctx.send("❌ Could not find that user.")
-    elif isinstance(error, commands.BadArgument):
-        await ctx.send("❌ Invalid argument provided.")
-    else:
-        logger.error(f"Unhandled error: {error}")
-        await ctx.send("❌ An error occurred while processing your command.")
+    # Error handlers
+    async def on_command_error(self, ctx, error):
+        """Handle command errors"""
+        if isinstance(error, commands.MissingPermissions):
+            await ctx.send("❌ You don't have permission to use this command.")
+        elif isinstance(error, commands.MemberNotFound):
+            await ctx.send("❌ Could not find that user.")
+        elif isinstance(error, commands.BadArgument):
+            await ctx.send("❌ Invalid argument provided.")
+        else:
+            logger.error(f"Unhandled error: {error}")
+            await ctx.send(
+                "❌ An error occurred while processing your command.", error
+            )
 
 
 # Main execution
 if __name__ == "__main__":
+    intents = discord.Intents.default()
+    intents.message_content = True
+    intents.members = True
+    intents.presences = True
+
+    # bot = HundredDoCBot(command_prefix="!", intents=intents)
+
     # Initialize and run the bot
     bot = HundredDoCBot()
-
-    # Replace with your bot token
-    TOKEN = "DISCORD_BOT_TOKEN"
 
     try:
         bot.run(TOKEN)
@@ -726,7 +760,7 @@ if __name__ == "__main__":
         logger.error(f"Failed to start bot: {e}")
         print("\n🔧 Setup Instructions:")
         print(
-            "1. Replace 'YOUR_BOT_TOKEN_HERE' with your actual Discord bot token"
+            "1. Replace 'DISCORD_BOT_TOKEN' with your actual Discord bot token"
         )
         print("2. Install required packages: pip install discord.py")
         print("3. Create a #100-days-log channel in your Discord server")
