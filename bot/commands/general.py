@@ -71,7 +71,9 @@ class GeneralCommands(commands.Cog):
                 "• `!status` - Check your own streak status\n"
                 "• `!myrank` - See your leaderboard rank\n"
                 "• `!remind-toggle` - Opt in/out of inactivity reminders\n"
-                "• `!hall-of-fame` - View the Hall of Fame (users who completed 100 days)"
+                "• `!hall-of-fame` - View the Hall of Fame (users who completed 100 days)\n"
+                "• `!linkrepo <repo_url>` - Link a public GitHub repo to your profile\n"
+                "• `!github [n]` - DM yourself the last n commits from your linked repo (default 3)"
             ),
             inline=False,
         )
@@ -216,3 +218,58 @@ class GeneralCommands(commands.Cog):
                 name=username, value=f"Completed on {date_str}", inline=False
             )
         await ctx.send(embed=embed)
+
+    @commands.command(name="linkrepo")
+    async def linkrepo(self, ctx, repo: str):
+        user_id = ctx.author.id
+        # Accept full URL or user/repo
+        repo = repo.strip()
+        if repo.startswith("https://github.com/"):
+            repo = repo[len("https://github.com/") :]
+        repo = repo.rstrip("/")
+        if len(repo.split("/")) != 2:
+            await ctx.send(
+                "❌ Please provide a valid GitHub repo URL or user/repo format."
+            )
+            return
+        self.bot.db.set_user_repo(user_id, repo)
+        await ctx.send(f"🔗 Linked GitHub repo `{repo}` to your profile!")
+
+    @commands.command(name="github")
+    async def github_commits(self, ctx, n: int = 3):
+        user_id = ctx.author.id
+        repo = self.bot.db.get_user_repo(user_id)
+        if not repo:
+            try:
+                await ctx.author.send(
+                    "❌ You haven’t linked a GitHub repo yet. Use !linkrepo <repo_url> to connect your progress."
+                )
+            except Exception:
+                await ctx.send(
+                    "❌ Could not send you a DM. Please check your privacy settings."
+                )
+            return
+        import aiohttp
+
+        api_url = f"https://api.github.com/repos/{repo}/commits"
+        async with aiohttp.ClientSession() as session:
+            async with session.get(api_url) as resp:
+                if resp.status != 200:
+                    await ctx.author.send(
+                        f"❌ Could not fetch commits for `{repo}`. Make sure the repo is public and exists."
+                    )
+                    return
+                data = await resp.json()
+        commits = data[:n]
+        if not commits:
+            await ctx.author.send(f"ℹ️ No commits found for `{repo}`.")
+            return
+        msg = f"**Last {len(commits)} commits for `{repo}`:**\n"
+        for c in commits:
+            date = c["commit"]["committer"]["date"][:10]
+            message = c["commit"]["message"].split("\n")[0]
+            url = c["html_url"]
+            msg += f"[`{date}`] [{message}]({url})\n"
+        await ctx.author.send(msg)
+        if ctx.guild:
+            await ctx.message.add_reaction("📬")

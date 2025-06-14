@@ -37,6 +37,14 @@ class DatabaseManager:
             )
             """
         )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_repos (
+                user_id INTEGER PRIMARY KEY,
+                github_repo TEXT NOT NULL
+            )
+            """
+        )
         # Migration: add reminders_enabled if missing
         cursor.execute("PRAGMA table_info(user_streaks)")
         columns = [row[1] for row in cursor.fetchall()]
@@ -277,6 +285,29 @@ class DatabaseManager:
         )
         conn.commit()
         conn.close()
+
+    def set_user_repo(self, user_id: int, github_repo: str) -> None:
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT OR REPLACE INTO user_repos (user_id, github_repo) VALUES (?, ?)",
+            (user_id, github_repo),
+        )
+        conn.commit()
+        conn.close()
+
+    def get_user_repo(self, user_id: int) -> Optional[str]:
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT github_repo FROM user_repos WHERE user_id = ?",
+            (user_id,),
+        )
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return row[0]
+        return None
 
     def get_connection(self):
         return sqlite3.connect(self.db_path)

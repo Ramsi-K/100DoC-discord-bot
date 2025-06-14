@@ -17,7 +17,7 @@ A feature-rich Discord bot to help your community track, celebrate, and manage t
   - `!list-users` — List all tracked users
   - `!drop-user @user` — Remove a user from tracking
   - `!inactive [days]` — List users inactive for N days
-- **Hall of Fame:** `!halloffame` shows users who completed 100 days.
+- **Hall of Fame:** `!hall-of-fame` shows users who completed 100 days.
 
 ## Usage
 
@@ -26,10 +26,13 @@ A feature-rich Discord bot to help your community track, celebrate, and manage t
    - Only one log per day (UTC).
 2. **Commands:**
    - `!leaderboard` — See top streaks
+   - - `!help` — Show full list of available commands (auto-hides admin commands if you're not an admin)
    - `!status` — See your streak
    - `!myrank` — See your leaderboard rank
    - `!remind-toggle` — Opt in/out of inactivity DMs
-   - `!halloffame` — See the Hall of Fame
+   - `!hall-of-fame` — See the Hall of Fame
+   - `!linkrepo <repo_url>` - Link a public GitHub repo to your profile
+   - `!github [n]` - DM yourself the last n commits from your linked repo (default 3)"
    - Admins: see below
 
 ## Admin Commands
