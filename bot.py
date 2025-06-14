@@ -329,19 +329,31 @@ class StreakValidator:
     ) -> Tuple[bool, str]:
         """Check if enough time has passed since last post"""
         now = datetime.datetime.now(datetime.timezone.utc)
-        time_diff = now - last_post_time
 
-        if time_diff >= datetime.timedelta(hours=24):
+        now_utc = datetime.datetime.now(datetime.timezone.utc).date()
+        last_post_day = last_post_time.date()
+
+        if now_utc > last_post_day:
             return True, ""
+        else:
+            return (
+                False,
+                "⏰ You've already posted today. Please come back after 00:00 UTC [<t:1749859200:t>] for your next update!",
+            )
 
-        remaining = datetime.timedelta(hours=24) - time_diff
-        hours = remaining.seconds // 3600
-        minutes = (remaining.seconds % 3600) // 60
+        # time_diff = now - last_post_time
 
-        return (
-            False,
-            f"Please wait {hours}h {minutes}m before your next post (24-hour cooldown)",
-        )
+        # if time_diff >= datetime.timedelta(hours=24):
+        #     return True, ""
+
+        # remaining = datetime.timedelta(hours=24) - time_diff
+        # hours = remaining.seconds // 3600
+        # minutes = (remaining.seconds % 3600) // 60
+
+        # return (
+        #     False,
+        #     f"Please wait {hours}h {minutes}m before your next post (24-hour cooldown)",
+        # )
 
 
 class HundredDoCBot(commands.Bot):
