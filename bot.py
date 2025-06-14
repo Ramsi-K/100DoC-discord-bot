@@ -442,7 +442,9 @@ class HundredDoCBot(commands.Bot):
                 )
             else:
                 await message.add_reaction("✅")
-                if day_number % 10 == 0:  # Milestone celebrations
+                if (
+                    day_number % 10 == 0 and day_number < 100
+                ):  # Milestone celebrations
                     await message.reply(
                         f"🔥 Milestone reached! Day {day_number} - Keep going strong! 💪"
                     )
