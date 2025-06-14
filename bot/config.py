@@ -11,7 +11,13 @@ class ChannelConfig:
     """Channel configuration for feature control"""
 
     LOGGING_CHANNEL = "100-days-log"
-    ALLOWED_COMMAND_CHANNELS = ["bot-commands", "general", "admin"]
+    ALLOWED_COMMAND_CHANNELS = [
+        "debug-room",  # for testing
+        "cloud-chat",  # main discussion
+        "off-topic",
+        "quick-help",
+        "sheclouds",
+    ]
 
     @classmethod
     def is_logging_channel(cls, channel_name: str) -> bool:
