@@ -11,6 +11,9 @@ A feature-rich Discord bot to help your community track, celebrate, and manage t
 - **Admin User Status:** `!userstatus @user` for admins to check any user's streak.
 - **Reminders:** Automatic DMs and public reminders for inactivity (3, 5, 7, 14 days).
 - **Opt-in/out:** `!remind-toggle` lets users control DM reminders.
+- **GitHub Integration:**
+  - `!linkrepo <repo_url>` — Link a public GitHub repo to your profile
+  - `!github [n]` — DM yourself the last n commits from your linked repo
 - **Admin Tools:**
   - `!reset @user` — Reset a user's streak
   - `!force-add @user day` — Set a user's day
@@ -31,8 +34,8 @@ A feature-rich Discord bot to help your community track, celebrate, and manage t
    - `!myrank` — See your leaderboard rank
    - `!remind-toggle` — Opt in/out of inactivity DMs
    - `!hall-of-fame` — See the Hall of Fame
-   - `!linkrepo <repo_url>` - Link a public GitHub repo to your profile
-   - `!github [n]` - DM yourself the last n commits from your linked repo (default 3)"
+   - `!linkrepo <repo_url>` — Link a public GitHub repo to your profile
+   - `!github [n]` — DM yourself the last n commits from your linked repo (default 3)"
    - Admins: see below
 
 ## Admin Commands
@@ -58,7 +61,7 @@ A feature-rich Discord bot to help your community track, celebrate, and manage t
    ```bash
    pip install -r requirements.txt
    # or
-   pip install discord.py python-dotenv
+   pip install discord.py python-dotenv aiohttp
    ```
 
 3. **Create a `.env` file:**
@@ -67,19 +70,21 @@ A feature-rich Discord bot to help your community track, celebrate, and manage t
    DISCORD_BOT_TOKEN=your-bot-token-here
    ```
 
-4. **Run the bot:**
+### Docker (Recommended)
 
+1. **Build and run with Docker Compose:**
    ```bash
-   python main.py
+   docker-compose up --build -d
    ```
+2. **Your SQLite DB will be stored in `./data/streaks.db` and will persist across restarts.**
+3. **The bot will restart automatically on crash or reboot.**
 
-5. **Set up your Discord server:**
-   - Create a `#100-days-log` channel.
-   - Give the bot permissions to read/send messages, add reactions, and manage messages in relevant channels.
+- If running on Windows, use Docker Desktop and run the above commands in PowerShell or CMD.
 
 ## Database
 
 - Uses SQLite (`streaks.db`) for persistent tracking.
+- All tables (`user_streaks`, `hall_of_fame`, `user_repos`) are auto-initialized.
 - Hall of Fame is stored in a separate table and shown via `!halloffame`.
 
 ## Contributing

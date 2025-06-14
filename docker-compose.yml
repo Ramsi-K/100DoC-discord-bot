@@ -1,0 +1,13 @@
+services:
+  bot:
+    build: .
+    container_name: 100doc-bot
+    restart: unless-stopped
+    environment:
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      - DB_PATH=/data/streaks.db
+    volumes:
+      - ./data:/data
+    # Optionally, set timezone
+    # environment:
+    #   - TZ=UTC
