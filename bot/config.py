@@ -25,7 +25,4 @@ class ChannelConfig:
 
     @classmethod
     def is_command_allowed(cls, channel_name: str) -> bool:
-        return (
-            channel_name in cls.ALLOWED_COMMAND_CHANNELS
-            or channel_name == cls.LOGGING_CHANNEL
-        )
+        return channel_name in cls.ALLOWED_COMMAND_CHANNELS
