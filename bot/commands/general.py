@@ -40,7 +40,7 @@ class GeneralCommands(commands.Cog):
             )
         await ctx.send(embed=embed)
 
-    @commands.command(name="100doc-help")
+    @commands.command(name="help")
     async def help_command(self, ctx):
         if not ChannelConfig.is_command_allowed(ctx.channel.name):
             return
@@ -53,10 +53,11 @@ class GeneralCommands(commands.Cog):
             name="📝 How to Log Progress",
             value=(
                 "• Post in #100-days-log channel only\n"
-                "• Format: `[day/100] Your progress description`\n"
-                "• Example: `[1/100] Started learning Python basics`\n"
+                "• Format: `[day/100] Your progress description.`\n"
+                "• Include square brackets\n"
+                "• Example: `[12/100] Started learning IAM basics`\n"
                 "• Must start with day 1: `[1/100]`\n"
-                "• Only one post in a 24 hour period\n"
+                "• Only one post per day\n"
                 "• Clock resets at 00:00 UTC\n"
                 "• No skipping days or going backwards"
             ),
@@ -66,19 +67,28 @@ class GeneralCommands(commands.Cog):
             name="🤖 Commands",
             value=(
                 "• `!leaderboard` - View top 5 streaks\n"
-                "• `!100doc-help` - Show this help message"
+                "• `!help` - Show this help message\n"
+                "• `!status` - Check your own streak status\n"
+                "• `!myrank` - See your leaderboard rank\n"
+                "• `!remind-toggle` - Opt in/out of inactivity reminders\n"
+                "• `!hall-of-fame` - View the Hall of Fame (users who completed 100 days)"
             ),
             inline=False,
         )
-        embed.add_field(
-            name="📋 Admin Commands",
-            value=(
-                "• `!reset @user` - Reset user's streak\n"
-                "• `!force-add @user day` - Set user to specific day\n"
-                "• `!status @user` - Check user's status"
-            ),
-            inline=False,
-        )
+        # Only show admin commands if user is admin
+        if ctx.author.guild_permissions.administrator:
+            embed.add_field(
+                name="📋 Admin Commands",
+                value=(
+                    "• `!reset @user` - Reset user's streak\n"
+                    "• `!force-add @user day` - Set user to specific day\n"
+                    "• `!userstatus @user` - Check any user's streak status\n"
+                    "• `!list-users` - List all tracked users\n"
+                    "• `!drop-user @user` - Remove a user from tracking\n"
+                    "• `!inactive [days]` - List users inactive for N days (default 3)"
+                ),
+                inline=False,
+            )
         embed.add_field(
             name="🔔 Reminders",
             value=(
@@ -97,7 +107,7 @@ class GeneralCommands(commands.Cog):
         user_data = self.bot.db.get_user_data(user_id)
         if not user_data:
             await ctx.send(
-                "❌ You're not being tracked yet. Start with `[1/100]` in #100-days-log."
+                "❌ You're not being tracked yet. Join the challenge! Start with `[1/100]` in #100-days-log channel."
             )
             return
         enabled = user_data.get("reminders_enabled", True)
@@ -117,7 +127,9 @@ class GeneralCommands(commands.Cog):
         user_id = ctx.author.id
         user_data = self.bot.db.get_user_data(user_id)
         if not user_data:
-            await ctx.send("❌ You're not being tracked yet.")
+            await ctx.send(
+                "❌ You're not being tracked yet. Join the challenge! Start with `[1/100]` in #100-days-log channel."
+            )
             return
         leaderboard = self.bot.db.get_leaderboard(limit=1000)
         rank = next(
@@ -141,7 +153,7 @@ class GeneralCommands(commands.Cog):
         user_data = self.bot.db.get_user_data(user_id)
         if not user_data:
             await ctx.send(
-                "❌ You're not being tracked yet. Start with `[1/100]` in #100-days-log."
+                "❌ You're not being tracked yet. Join the challenge! Start with `[1/100]` in #100-days-log channel."
             )
             return
         days_ago = (
@@ -172,5 +184,35 @@ class GeneralCommands(commands.Cog):
                 name="Completed",
                 value=user_data["completed_at"].strftime("%Y-%m-%d %H:%M UTC"),
                 inline=False,
+            )
+        await ctx.send(embed=embed)
+
+    @commands.command(name="hall-of-fame")
+    async def hall_of_fame(self, ctx):
+        if not ChannelConfig.is_command_allowed(ctx.channel.name):
+            return
+        conn = self.bot.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT username, completed_at FROM hall_of_fame ORDER BY completed_at ASC"
+        )
+        records = cursor.fetchall()
+        conn.close()
+        if not records:
+            await ctx.send(
+                "🏛️ No one has entered the Hall of Fame yet. Be the first to reach Day 100!"
+            )
+            return
+        embed = discord.Embed(
+            title="🏛️ 100 Days of Code – Hall of Fame",
+            description="Legendary coders who completed the challenge:",
+            color=0xFFD700,
+        )
+        for username, completed_at in records:
+            date_str = datetime.datetime.fromisoformat(completed_at).strftime(
+                "%b %d, %Y"
+            )
+            embed.add_field(
+                name=username, value=f"Completed on {date_str}", inline=False
             )
         await ctx.send(embed=embed)

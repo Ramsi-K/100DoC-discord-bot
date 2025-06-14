@@ -1,2 +1,9 @@
+# Bytecode
+__pycache__/
+*.py[cod]
+
+# Env file
 .env
-*.db
+
+# DB file (optional if private)
+streaks.db

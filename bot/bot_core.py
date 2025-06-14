@@ -63,10 +63,13 @@ class HundredDoCBot(commands.Bot):
             )
         if success:
             if day_number == 100:
+                self.db.archive_to_hof(user_id, username)
+
                 await message.reply(
                     f"🎉 **CONGRATULATIONS {username}!** 🎉\n"
                     f"You've completed the 100 Days of Code challenge! "
-                    f"What an incredible achievement! 🏆✨"
+                    f"What an incredible achievement! ✨"
+                    f"Welcome to the Hall of Fame! 🏆"
                 )
             else:
                 await message.add_reaction("✅")
@@ -149,6 +152,12 @@ class HundredDoCBot(commands.Bot):
                         f"💔 {user.mention} has been removed from tracking after 14 days of inactivity. "
                         f"You can restart anytime with [1/100]!"
                     )
+                    try:
+                        await user.send(
+                            "💔 You’ve been removed from 100 Days of Code tracking after 14 days of inactivity. This challenge is tough, but every attempt is progress! When you’re ready, you can always start again with [1/100]. We believe in you!"
+                        )
+                    except Exception:
+                        pass
                 except Exception as e:
                     logger.error(
                         f"Failed to notify removal of user {user_data['user_id']}: {e}"
@@ -170,5 +179,5 @@ class HundredDoCBot(commands.Bot):
         else:
             logger.error(f"Unhandled error: {error}")
             await ctx.send(
-                "❌ An error occurred while processing your command.", error
+                "❌ An error occurred while processing your command."
             )

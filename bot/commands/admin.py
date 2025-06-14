@@ -1,7 +1,7 @@
-# commands/admin.py: admin commands (reset, force-add, status)
+# commands/admin.py: admin commands (reset, force-add)
 import discord
-from discord.ext import commands
 import datetime
+from discord.ext import commands
 from ..config import ChannelConfig
 
 
@@ -17,6 +17,12 @@ class AdminCommands(commands.Cog):
         success = self.bot.db.reset_user(member.id)
         if success:
             await ctx.send(f"✅ Reset {member.mention}'s streak back to day 1")
+            try:
+                await member.send(
+                    "🔄 Your 100 Days of Code streak has been reset to Day 1 by an admin.  Please log your progress again starting with [1/100] or reach out to the admin team if you have questions."
+                )
+            except Exception:
+                pass
         else:
             await ctx.send(
                 f"❌ User {member.mention} not found in tracking system"
@@ -36,15 +42,55 @@ class AdminCommands(commands.Cog):
         else:
             await ctx.send("❌ Error updating user data")
 
-    @commands.command(name="status")
+    @commands.command(name="list-users")
+    @commands.has_permissions(administrator=True)
+    async def list_users(self, ctx):
+        all_users = self.bot.db.get_leaderboard(limit=1000)
+        if not all_users:
+            await ctx.send("📋 No tracked users in the database.")
+            return
+
+        lines = []
+        for i, user in enumerate(all_users, 1):
+            days_ago = (
+                datetime.datetime.now(datetime.timezone.utc)
+                - user["last_post_timestamp"]
+            ).days
+            lines.append(
+                f"{i}. {user['username']} — Day {user['current_day']} ({days_ago}d ago)"
+            )
+
+        chunks = [lines[i : i + 10] for i in range(0, len(lines), 10)]
+        for chunk in chunks:
+            await ctx.send("\n".join(chunk))
+
+    @commands.command(name="drop-user")
+    @commands.has_permissions(administrator=True)
+    async def drop_user(self, ctx, member: discord.Member):
+        conn = self.bot.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM user_streaks WHERE user_id = ?", (member.id,)
+        )
+        conn.commit()
+        conn.close()
+        await ctx.send(
+            f"🗑️ {member.display_name} has been removed from tracking."
+        )
+        try:
+            await member.send(
+                "🗑️ You have been removed from 100 Days of Code tracking by an admin. Please log your progress again starting with [1/100] or reach out to the admin team if you have questions."
+            )
+        except Exception:
+            pass
+
+    @commands.command(name="userstatus")
     @commands.has_permissions(administrator=True)
     async def user_status(self, ctx, member: discord.Member):
-        if not ChannelConfig.is_command_allowed(ctx.channel.name):
-            return
         user_data = self.bot.db.get_user_data(member.id)
         if not user_data:
             await ctx.send(
-                f"❌ {member.mention} is not in the tracking system"
+                f"❌ {member.mention} is not in the tracking system."
             )
             return
         days_ago = (
@@ -53,7 +99,7 @@ class AdminCommands(commands.Cog):
         ).days
         status = "Active" if user_data["is_active"] else "Inactive"
         embed = discord.Embed(
-            title=f"📊 Status for {user_data['username']}",
+            title=f"🔎 Status for {user_data['username']}",
             color=0x00FF00 if user_data["is_active"] else 0xFF0000,
         )
         embed.add_field(
@@ -77,3 +123,15 @@ class AdminCommands(commands.Cog):
                 inline=False,
             )
         await ctx.send(embed=embed)
+
+    @commands.command(name="inactive")
+    @commands.has_permissions(administrator=True)
+    async def list_inactive(self, ctx, days: int = 3):
+        users = self.bot.db.get_inactive_users(days_threshold=days)
+        if not users:
+            await ctx.send("✅ No inactive users found.")
+            return
+        for u in users:
+            await ctx.send(
+                f"{u['username']} — Day {u['current_day']} (last seen {u['last_post_timestamp'].strftime('%b %d')})"
+            )

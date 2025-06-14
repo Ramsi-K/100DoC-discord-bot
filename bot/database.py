@@ -28,6 +28,15 @@ class DatabaseManager:
             )
         """
         )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS hall_of_fame (
+                user_id INTEGER PRIMARY KEY,
+                username TEXT NOT NULL,
+                completed_at TEXT NOT NULL
+            )
+            """
+        )
         # Migration: add reminders_enabled if missing
         cursor.execute("PRAGMA table_info(user_streaks)")
         columns = [row[1] for row in cursor.fetchall()]
@@ -251,3 +260,23 @@ class DatabaseManager:
         conn.commit()
         conn.close()
         return success
+
+    def archive_to_hof(self, user_id: int, username: str) -> None:
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        cursor.execute(
+            """
+            INSERT OR REPLACE INTO hall_of_fame (user_id, username, completed_at)
+            VALUES (?, ?, ?)
+            """,
+            (user_id, username, now),
+        )
+        cursor.execute(
+            "DELETE FROM user_streaks WHERE user_id = ?", (user_id,)
+        )
+        conn.commit()
+        conn.close()
+
+    def get_connection(self):
+        return sqlite3.connect(self.db_path)
