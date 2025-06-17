@@ -3,6 +3,7 @@ import discord
 from discord.ext import commands, tasks
 import datetime
 import logging
+import os
 from .config import ChannelConfig
 from .database import DatabaseManager
 from .validators import StreakValidator
@@ -17,7 +18,8 @@ class HundredDoCBot(commands.Bot):
         intents = discord.Intents.default()
         intents.message_content = True
         super().__init__(command_prefix="!", intents=intents)
-        self.db = DatabaseManager()
+        # Use the DB_PATH environment variable which is set in run_bot()
+        self.db = DatabaseManager(os.environ.get("DB_PATH", "/data/streaks.db"))
         self.validator = StreakValidator()
         self.remove_command("help")
 

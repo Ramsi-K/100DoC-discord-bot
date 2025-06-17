@@ -6,8 +6,8 @@ import pathlib
 import shutil
 
 app = modal.App("discord-100doc-bot")
-cpu_request = 1.0
-cpu_limit = 4.0
+cpu_request = 0.125
+cpu_limit = 1.0
 
 # Remote, persisted volumes
 db_volume = modal.Volume.from_name("discord-bot-db", create_if_missing=True)
@@ -38,6 +38,14 @@ LOGS_PATH = pathlib.Path(LOGS_DIR) / LOGS_FILENAME
     timeout=60 * 60 * 24,  # 24 hours
 )
 def run_bot():
+    # Reload the volume to ensure we have the latest data
+    try:
+        db_volume.reload()
+        print("Database volume loaded successfully")
+    except Exception as e:
+        print(f"Warning: Failed to reload database volume: {e}")
+        print("Continuing with local database")
+    
     os.makedirs("/data", exist_ok=True)
     os.environ["DB_PATH"] = "/data/streaks.db"
     os.environ["DISCORD_BOT_TOKEN"] = os.environ["DISCORD_BOT_TOKEN"]
@@ -61,11 +69,21 @@ def run_bot():
 )
 def init_db():
     os.makedirs("/data", exist_ok=True)
-    from bot.database import DatabaseManager
-
-    db = DatabaseManager("/data/streaks.db")
-    db.init_database()
-    return "Database initialized at /data/streaks.db"
+    db_path = "/data/streaks.db"
+    # Only initialize if the database doesn't exist
+    if not os.path.exists(db_path):
+        from bot.database import DatabaseManager
+        db = DatabaseManager(db_path)
+        db.init_database()
+        try:
+            db_volume.commit()  # Commit changes to the volume
+            print("Database changes committed to volume")
+        except Exception as e:
+            print(f"Warning: Failed to commit database to volume: {e}")
+            print("Database will operate in local mode")
+        return "Database initialized at /data/streaks.db"
+    else:
+        return "Database already exists at /data/streaks.db"
 
 
 @app.function(
@@ -79,7 +97,11 @@ def log_resource_usage():
     import json
     from datetime import datetime
 
-    logs_volume.reload()
+    try:
+        logs_volume.reload()
+    except Exception as e:
+        print(f"Warning: Failed to reload logs volume: {e}")
+    
     os.makedirs(LOGS_DIR, exist_ok=True)
 
     metrics = {
@@ -101,15 +123,20 @@ def log_resource_usage():
         pathlib.Path(LOGS_DIR).mkdir(parents=True, exist_ok=True)
         shutil.copyfile(tmp_logs_path, LOGS_PATH)
 
-    logs_volume.commit()
-    print("Resource log committed to volume.")
+    try:
+        logs_volume.commit()
+        print("Resource log committed to volume.")
+    except Exception as e:
+        print(f"Warning: Failed to commit logs to volume: {e}")
+    
     return metrics
 
 
 @app.local_entrypoint()
 def main():
-    print("Initializing database...")
-    init_db.remote()
+    print("Checking database...")
+    result = init_db.remote()
+    print(result)
     print("Starting Discord bot...")
     run_bot.remote()
     print("Bot is running. Monitoring resource usage...")

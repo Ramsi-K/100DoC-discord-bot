@@ -1,15 +1,26 @@
 # database.py: DatabaseManager class
 import sqlite3
 import datetime
-from typing import Dict, List, Optional
+import os
+import logging
+from typing import Dict, List, Optional, Tuple
+
+# Try to import modal for volume operations
+try:
+    import modal
+except ImportError:
+    pass  # Modal not available in local development
 
 
 class DatabaseManager:
     """Handles all database operations for user streaks"""
 
-    def __init__(self, db_path: str = "streaks.db"):
+    def __init__(self, db_path: str = None):
+        if db_path is None:
+            db_path = os.environ.get("DB_PATH", "/data/streaks.db")
         self.db_path = db_path
-        self.init_database()
+        # Don't automatically initialize the database on creation
+        # This allows us to connect to an existing database without recreating it
 
     def init_database(self):
         conn = sqlite3.connect(self.db_path)
@@ -54,6 +65,7 @@ class DatabaseManager:
             )
         conn.commit()
         conn.close()
+        self.commit_to_volume()
 
     def get_user_data(self, user_id: int) -> Optional[Dict]:
         conn = sqlite3.connect(self.db_path)
@@ -98,6 +110,7 @@ class DatabaseManager:
             )
             conn.commit()
             conn.close()
+            self.commit_to_volume()
             return True
         except sqlite3.IntegrityError:
             conn.close()
@@ -121,6 +134,9 @@ class DatabaseManager:
         success = cursor.rowcount > 0
         conn.commit()
         conn.close()
+        
+        if success:
+            self.commit_to_volume()
         return success
 
     def get_leaderboard(self, limit: int = 5) -> List[Dict]:
@@ -188,6 +204,8 @@ class DatabaseManager:
         success = cursor.rowcount > 0
         conn.commit()
         conn.close()
+        if success:
+            self.commit_to_volume()
         return success
 
     def reset_user(self, user_id: int) -> bool:
@@ -205,6 +223,8 @@ class DatabaseManager:
         success = cursor.rowcount > 0
         conn.commit()
         conn.close()
+        if success:
+            self.commit_to_volume()
         return success
 
     def force_set_day(self, user_id: int, username: str, day: int) -> bool:
@@ -238,24 +258,27 @@ class DatabaseManager:
         return success
 
     def toggle_reminders(self, user_id: int) -> Optional[bool]:
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute(
+        # Get current value
+        success, result = self.execute_safely(
             "SELECT reminders_enabled FROM user_streaks WHERE user_id = ?",
             (user_id,),
+            'one'
         )
-        result = cursor.fetchone()
-        if result is None:
-            conn.close()
+        
+        if not success or result is None:
             return None
+            
+        # Toggle value
         new_value = 0 if result[0] else 1
-        cursor.execute(
+        success, _ = self.execute_safely(
             "UPDATE user_streaks SET reminders_enabled = ? WHERE user_id = ?",
-            (new_value, user_id),
+            (new_value, user_id)
         )
-        conn.commit()
-        conn.close()
-        return bool(new_value)
+        
+        if success:
+            self.commit_to_volume()
+            return bool(new_value)
+        return None
 
     def set_reminders_enabled(self, user_id: int, enabled: bool) -> bool:
         conn = sqlite3.connect(self.db_path)
@@ -267,6 +290,8 @@ class DatabaseManager:
         success = cursor.rowcount > 0
         conn.commit()
         conn.close()
+        if success:
+            self.commit_to_volume()
         return success
 
     def archive_to_hof(self, user_id: int, username: str) -> None:
@@ -285,6 +310,7 @@ class DatabaseManager:
         )
         conn.commit()
         conn.close()
+        self.commit_to_volume()
 
     def set_user_repo(self, user_id: int, github_repo: str) -> None:
         conn = sqlite3.connect(self.db_path)
@@ -295,6 +321,7 @@ class DatabaseManager:
         )
         conn.commit()
         conn.close()
+        self.commit_to_volume()
 
     def get_user_repo(self, user_id: int) -> Optional[str]:
         conn = sqlite3.connect(self.db_path)
@@ -310,4 +337,52 @@ class DatabaseManager:
         return None
 
     def get_connection(self):
-        return sqlite3.connect(self.db_path)
+        """Get a database connection with timeout to prevent hanging"""
+        return sqlite3.connect(self.db_path, timeout=10)
+    
+    def execute_safely(self, operation, params=None, fetch_type=None) -> Tuple[bool, any]:
+        """Execute a database operation safely with proper error handling
+        
+        Args:
+            operation: SQL statement to execute
+            params: Parameters for the SQL statement
+            fetch_type: None for no fetch, 'one' for fetchone, 'all' for fetchall
+            
+        Returns:
+            Tuple of (success, result)
+        """
+        conn = None
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            if params:
+                cursor.execute(operation, params)
+            else:
+                cursor.execute(operation)
+                
+            result = None
+            if fetch_type == 'one':
+                result = cursor.fetchone()
+            elif fetch_type == 'all':
+                result = cursor.fetchall()
+            else:
+                result = cursor.rowcount
+                
+            conn.commit()
+            return True, result
+        except sqlite3.Error as e:
+            logging.error(f"Database error: {e}")
+            return False, None
+        finally:
+            if conn:
+                conn.close()
+        
+    def commit_to_volume(self):
+        """Commit changes to the Modal volume if available"""
+        try:
+            if 'modal' in globals():
+                modal.Volume.from_name("discord-bot-db").commit()
+        except Exception as e:
+            logging.error(f"Failed to commit to volume: {e}")
+            # Continue operation even if volume commit fails
+            # This ensures the bot keeps working with local DB
