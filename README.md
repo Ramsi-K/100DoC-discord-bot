@@ -47,6 +47,41 @@ A feature-rich Discord bot to help your community track, celebrate, and manage t
 - `!drop-user @user` — Remove a user from tracking
 - `!inactive [days]` — List users inactive for N days (default 3)
 
+## Deploy on Modal
+
+1. **Clone the repo:**
+
+   ```bash
+   git clone <your-repo-url>
+   cd 100DoC-discord-bot
+   ```
+
+2. **Install dependencies:**
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Setup your Modal Account and setup modal the Discord Bot Token:**
+
+   ```bash
+   modal setup
+   ```
+
+4. **Save Discord Bot Token in Modal Secrets:**
+
+   ```env
+   discord-secret=DISCORD_BOT_TOKEN
+   ```
+
+5. **Deploy and Run the Modal App:**
+   ```bash
+   modal deploy app.py
+   python deploy.py
+   ```
+
+This sets up the app to run on Modal. Closing the terminal or ctrl+C will not stop the app. To stop the app, go to the Modal dashboard.
+
 ## Setup
 
 1. **Clone the repo:**
