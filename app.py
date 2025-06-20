@@ -32,10 +32,12 @@ LOGS_PATH = pathlib.Path(LOGS_DIR) / LOGS_FILENAME
 @app.function(
     image=image,
     volumes={"/data": db_volume},
-    # keep_warm=1,
     cpu=(cpu_request, cpu_limit),
     secrets=[modal.Secret.from_name("discord-secret")],
     timeout=60 * 60 * 24,  # 24 hours
+    schedule=modal.Cron(
+        "55 9 * * *", timezone="UTC"
+    ),  # 3:25 PM IST daily - before reminders
 )
 def run_bot():
     # Reload the volume to ensure we have the latest data
@@ -45,7 +47,7 @@ def run_bot():
     except Exception as e:
         print(f"Warning: Failed to reload database volume: {e}")
         print("Continuing with local database")
-    
+
     os.makedirs("/data", exist_ok=True)
     os.environ["DB_PATH"] = "/data/streaks.db"
     os.environ["DISCORD_BOT_TOKEN"] = os.environ["DISCORD_BOT_TOKEN"]
@@ -73,6 +75,7 @@ def init_db():
     # Only initialize if the database doesn't exist
     if not os.path.exists(db_path):
         from bot.database import DatabaseManager
+
         db = DatabaseManager(db_path)
         db.init_database()
         try:
@@ -101,7 +104,7 @@ def log_resource_usage():
         logs_volume.reload()
     except Exception as e:
         print(f"Warning: Failed to reload logs volume: {e}")
-    
+
     os.makedirs(LOGS_DIR, exist_ok=True)
 
     metrics = {
@@ -128,7 +131,7 @@ def log_resource_usage():
         print("Resource log committed to volume.")
     except Exception as e:
         print(f"Warning: Failed to commit logs to volume: {e}")
-    
+
     return metrics
 
 
