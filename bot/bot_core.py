@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class HundredDoCBot(commands.Bot):
-    """Main bot class for 100 Days of Code tracking"""
+    """Main bot class for 100 Days of Cloud tracking"""
 
     def __init__(self):
         intents = discord.Intents.default()
@@ -69,7 +69,7 @@ class HundredDoCBot(commands.Bot):
 
                 await message.reply(
                     f"🎉 **CONGRATULATIONS {username}!** 🎉\n"
-                    f"You've completed the 100 Days of Code challenge! "
+                    f"You've completed the 100 Days of Cloud challenge! "
                     f"What an incredible achievement! ✨"
                     f"Welcome to the Hall of Fame! 🏆"
                 )
